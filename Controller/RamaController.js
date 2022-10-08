@@ -1,6 +1,8 @@
 const {response}=require('express');
 const Rama = require("../Model/Rama");
 const {RESPONSE_MESSAGES}=require('../Helpers/ResponseMessages');
+const logger = require('../Helpers/LoggerConfig');
+
 
 const createRama= async(req,res=response)=>{
     try{
@@ -70,7 +72,8 @@ const changeScoutBranch = async (req, res=response) => {
         newBranch.Scout.push(req.body.idScout);
         newBranch.save();
         return res.status(200).json({ok: true,msg:RESPONSE_MESSAGES.SUCCESS_2XX})
-    }catch(err){console.log(err);return res.status(500).json({ok: false,msg: RESPONSE_MESSAGES.ERR_500})}
+    }catch(e){logger.error(`changePasswordAdmin: Internal server error: ${e}`);
+    return res.status(500).json({ok: false,msg: RESPONSE_MESSAGES.ERR_500})}
 }
 const deleteRama= async(req,res=response)=>{
     let id  = req.params.id;

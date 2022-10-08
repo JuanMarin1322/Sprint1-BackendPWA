@@ -5,7 +5,9 @@ const {generateJWT} = require('../Helpers/jwt');
 const { generateRandomPass } = require('../Helpers/randomPassowrd');
 const {transporter,mailOptions_} = require('../Helpers/EmailConfig');
 const{RESPONSE_MESSAGES}=require('../Helpers/ResponseMessages');
+const logger = require("../Helpers/LoggerConfig");
 const Rama = require('../Model/Rama');
+const Acudiente = require('../Model/Acudiente');
 
 const createScout = async(req,res=response) => {
     let {email}=req.body;
@@ -24,8 +26,8 @@ const createScout = async(req,res=response) => {
         transporter.sendMail(mailOptions_(email,password,1,dbScout.nombre),(err)=>{if(err){console.log(err);}});
         const token= await generateJWT(dbScout.id,dbScout.nombre);
         return res.status(201).json({ok:true,uid:dbScout.id,nombre:dbScout.nombre,email,token});
-    } catch (error) {       
-        console.log(error);
+    } catch (e) {       
+        logger.error(`createScout: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
     }
 }
@@ -36,7 +38,7 @@ const changeScoutState = async(req,res=response) => {
         scout_.esActivo=req.body.esActivo;
         scout_.save();
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX,scout_});
-    }catch(err){console.log(err);
+    }catch(e){logger.error(`changeScoutState: Internal server error: ${error}`);
     return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
 }
 const readScoutBranch = async(req, res=response)=>{
@@ -45,7 +47,7 @@ const readScoutBranch = async(req, res=response)=>{
         if(!branch){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND})}
         return res.status(200).json({ok:true,branch,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
     }catch(err){
-        console.log(err);
+        logger.error(`CreateScout: Internal server error: ${err}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
 }
 const readActiveScouts = async(req,res=response) =>{
@@ -54,17 +56,17 @@ const readActiveScouts = async(req,res=response) =>{
         if(_activeScouts){return res.status(200).json({ok:true,_activeScouts});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
-        console(e);
+        logger.error(`readActiveScouts: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
 const readScouts= async(req,res=response)=>{
     try{
-        let scouts_ = await Scout.find({});
+        let scouts_ = await Scout.find();
         if(scouts_){return res.status(200).json({ok:true,scouts_ });}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
-        console.log(e);
+        logger.error(`readScouts: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
@@ -75,7 +77,7 @@ const readScout= async(req,res=response)=>{
         if(scouts_){return res.status(200).json({ok:true,scouts_ });}    
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
-        console.log(e);
+        logger.error(`readScout: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
@@ -91,7 +93,7 @@ const loginScout= async(req,res=response) => {
      const token= await generateJWT(scoutDB.id,scoutDB.nombre,scoutDB.email,2);
      return res.status(200).json({ok:true,_id:scoutDB.id,nombre:scoutDB.nombre,email,rol: 2,token})
     } catch (error) {
-        console.log(error);
+        logger.error(`loginScout: Internal server error: ${error}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
@@ -103,13 +105,12 @@ const revalidateToken= async(req,res=response) => {
 }
 const updateScout= async(req,res=response) =>{
     try{
-        let id = req.params.id;
-        let scoutDb = Scout.findById(id);
+        let scoutDb = await Scout.findById(req.params.id);
         if(!scoutDb){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        await Scout.updateOne({_id:id}, {...req.body}, { upsert: true });
+        await Scout.updateOne({_id:req.params.id}, {$set:{...req.body}}, { upsert: true });
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
     }catch(e){
-        console.log(e);
+        logger.error(`updateScout: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
@@ -117,36 +118,41 @@ const updateScout= async(req,res=response) =>{
 const deleteScout = async (req,res=response) =>{
     try{
         const scoutDB = await Scout.findById(req.params.id);
-        if(!scoutDB){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        await Scout.findByIdAndDelete(req.params.id);
-        let rama = await Rama.findById(req.body.idRama);
-        if( !rama ) {return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        let oldScout = rama.Scout;
-        try{
-        for(let i = 0; i < oldScout.length; i++) {if(oldScout[i]===req.params.id){oldScout.splice(i, 1);}}
-        rama.Scout = oldScout;
-        await rama.save();
-        }catch(e){console.log(e);}
-        return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
-    }catch(e){
-        console.log(e);
+        if(!scoutDB){
+            return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+            let rama = await Rama.findOne({Scout:scoutDB.id});
+            if( !rama ) {
+                logger.info("deleteScout: associated branch not found");
+                return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+            let acudiente__ = await Acudiente.findOne({Scout:scoutDB.id});
+            let oldScout = rama.Scout,oldAcudiente_=acudiente__.Scout;
+            try{
+                for(let i = 0; i < oldScout.length; i++) {if(oldScout[i]===req.params.id){oldScout.splice(i, 1);}}
+                rama.Scout = oldScout;
+                await rama.save();
+                for(let i = 0; i < oldAcudiente_.length; i++) {if(oldAcudiente_[i]===req.params.id){oldAcudiente_.splice(i, 1);}}
+                acudiente__.Scout = oldAcudiente_;
+                await acudiente__.save();
+                await Scout.findByIdAndDelete(req.params.id);
+            }catch(e){logger.error(`deleteScout: Internal server error: ${e}`);}
+            return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
+        }catch(e){logger.error(`deleteScout: Internal server error: ${e}`);}
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
-}
+
 const changePassword = async (req, res)=>{
     try{
         let {newPassword,email} = req.body;
         const scoutDB = await Scout.findOne({email:email});
         if(!scoutDB){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
-        let password =bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
-        scoutDB.password = password;
+        scoutDB.password = bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
         await scoutDB.save();
         transporter.sendMail(mailOptions_(scoutDB.email,newPassword,2,scoutDB.nombre),(err)=>{
-            if(err){console.log(err);}
-        });
+            if(err){{logger.error(`changePasswordScout: Internal mail server error: ${err}`);}
+        }});
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
 }catch(e){
-    console.log(e);
+    logger.error(`changePasswordScout: Internal server error: ${e}`);
     return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
 }
 

@@ -4,56 +4,67 @@ const bcrypt=require('bcryptjs');
 const {generateJWT} = require('../Helpers/jwt');
 const { RESPONSE_MESSAGES } = require('../Helpers/ResponseMessages');
 const { generateRandomPass } = require('../Helpers/randomPassowrd');
+const logger = require('../Helpers/LoggerConfig');
 
 const createSuperAdministrador = async(req,res=response) => {
     let {nombre,email}=req.body;
     let password = generateRandomPass(10);
     try {
         let superAdmn=await SuperAdministrador.findOne({email});
-        if(superAdmn){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS});}
-        let dbSuperAdministrador=new SuperAdministrador(req.body);
-        dbSuperAdministrador.password=bcrypt.hashSync(password,bcrypt.genSaltSync());
-        const token= await generateJWT(dbSuperAdministrador.id,nombre);
-        await dbSuperAdministrador.save();
-        transporter.sendMail(mailOptions_(email,password,1,dbSuperAdministrador.nombre),(err)=>{if(err){console.log(err);}});
-        return res.status(201).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX,token});
-    } catch (error) {       
-        console.log(error);
-        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
-    }
+        if(superAdmn){
+            logger.error(`CreateSuperAdmin: Already exists an superAdmin account with the specified email`);
+            return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS});}
+            let dbSuperAdministrador=new SuperAdministrador(req.body);
+            dbSuperAdministrador.password=bcrypt.hashSync(password,bcrypt.genSaltSync());
+            const token= await generateJWT(dbSuperAdministrador.id,nombre);
+            await dbSuperAdministrador.save();
+            transporter.sendMail(mailOptions_(email,password,1,dbSuperAdministrador.nombre),(err)=>{if(err){logger.error(`CreateSuperAdmin: Internal mail server error: ${err}`);}});
+            return res.status(201).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX,token});
+    } catch (error) {logger.error(`CreateSuperAdmin: Internal server error: ${error}`);
+    return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+}
 }
 const readSuperAdministradors= async(req,res=response)=>{
     try{
-        let SuperAdministradors_ = await SuperAdministrador.find({});
-        if(SuperAdministradors_){return res.status(200).json({ok:true,SuperAdministradors_,msg:RESPONSE_MESSAGES.SUCCESS_2XX });}
-        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
-    }catch(e){
-        console.log(e);
-        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+        let SuperAdministradors_ = await SuperAdministrador.find( );
+        if(SuperAdministradors_){
+            logger.info("ReadSuperAdmins: sending superAdmins found...");
+            return res.status(200).json({ok:true,SuperAdministradors_,msg:RESPONSE_MESSAGES.SUCCESS_2XX });}
+            logger.error(`ReadSuperAdmins: SuperAdmins not found`);
+            return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+        }catch(e){
+            logger.error(`ReadSuperAdmins: Internal server error: ${e}`);
+            return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+        }
     }
-}
-const readSuperAdministrador= async(req,res=response)=>{
-    try{
-        const SuperAdministrador_ = await SuperAdministrador.findById(req.params.id);
-        if(SuperAdministradors){return res.status(200).json({ok:true,SuperAdministrador_, msg:RESPONSE_MESSAGES.SUCCESS_2XX });}
-        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
-    }catch(e){
-        console.log(e);
-        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+    const readSuperAdministrador= async(req,res=response)=>{
+        try{
+            const SuperAdministrador_ = await SuperAdministrador.findById(req.params.id);
+            if(SuperAdministrador_){
+                logger.info("ReadSuperAdmin: sending superAdmin found...");
+                return res.status(200).json({ok:true,SuperAdministrador_, msg:RESPONSE_MESSAGES.SUCCESS_2XX });}
+            logger.error(`ReadSuperAdmin: SuperAdmin not found`);
+            return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+        }catch(e){
+            logger.error(`ReadSuperAdmin: Internal server error: ${e}`);
+            return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+        }
     }
-}
-
-const loginSuperAdministrador= async(req,res=response) => {
-    const {email,password}=req.body;
-    try {
-     const SuperAdministradorDB = await SuperAdministrador.findOne({email});
-     if(!SuperAdministradorDB){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
-     const validPassword=bcrypt.compareSync(password,SuperAdministradorDB.password);
-     if(!validPassword){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_INVALID_PASSWORD});}
-     const token= await generateJWT(SuperAdministradorDB.id,SuperAdministradorDB.nombre,SuperAdministradorDB.email,0);
-     return res.status(200).json({ok:true,uid:SuperAdministradorDB.id,nombre:SuperAdministradorDB.nombre,email,rol:0,token});
+    
+    const loginSuperAdministrador= async(req,res=response) => {
+        const {email,password}=req.body;
+        try {
+            const SuperAdministradorDB = await SuperAdministrador.findOne({email});
+            logger.info("loginSuperAdmin: finding if email exists");
+            if(!SuperAdministradorDB){
+            logger.error(`loginSuperAdmin: SuperAdmin email not found`);
+            return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
+            const validPassword=bcrypt.compareSync(password,SuperAdministradorDB.password);
+            if(!validPassword){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_INVALID_PASSWORD});}
+            const token= await generateJWT(SuperAdministradorDB.id,SuperAdministradorDB.nombre,SuperAdministradorDB.email,0);
+            return res.status(200).json({ok:true,uid:SuperAdministradorDB.id,nombre:SuperAdministradorDB.nombre,email,rol:0,token});
     } catch (error) {
-        console.log(error);
+        logger.error(`loginSuperAdmin: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
     }
 }
@@ -64,12 +75,12 @@ const revalidateToken= async(req,res=response) => {
 }
 const updateSuperAdministrador= async(req,res=response) =>{
     try{
-        const SuperAdministradorDb = SuperAdministrador.findById(req.params.id);
+        const SuperAdministradorDb = await SuperAdministrador.findById(req.params.id);
         if(!SuperAdministradorDb){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        await SuperAdministrador.updateOne({_id:req.params.id}, {...req.body}, { upsert: true });
+        await SuperAdministrador.updateOne({_id:req.params.id},{$set:{...req.body}}, { upsert: true });
        return  res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX})
     }catch(e){
-        console.log(e);
+        logger.error(`updateSuperAdmin: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
     }
 }
@@ -81,7 +92,7 @@ const deleteSuperAdministrador = async (req,res=response) =>{
         await SuperAdministrador.findByIdAndDelete(req.params.id);
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
     }catch(e){
-        console.log(e);
+        logger.error(`deleteSuperAdmin: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
 
     }
@@ -94,11 +105,11 @@ const changePassword = async (req, res)=>{
         superAdmin.password = bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
         await superAdmin.save();
         transporter.sendMail(mailOptions_(superAdmin.email,newPassword,2,superAdmin.nombre),(err)=>{
-            if(err){console.log(err);}
+            if(err){logger.error(`changePasswordSuperAdmin: Internal mail server error: ${err}`);}
         });
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
 }catch(e){
-    console.log(e);
+    logger.error(`changePasswordSuperAdmin: Internal server error: ${e}`);
     return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
 }
 module.exports={

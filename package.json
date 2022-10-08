@@ -4,9 +4,21 @@
   "description": "Backend server for PWA Scouts, PI2 Ascent. MEN Stack",
   "main": "index.js",
   "scripts": {
-     "start": "node index.js"
+    "test-loginScout": "mocha -t 7000 ./tests/ScoutController/loginScout.test.js",
+    "test-createScout": "mocha ./tests/ScoutController/CreateScout.test.js",
+    "test-deleteScout": "mocha ./tests/ScoutController/DeleteScout.test.js",
+    "test-readScout": "mocha ./tests/ScoutController/ReadScout.test.js",
+    "test-readScouts": "mocha ./tests/ScoutController/ReadScouts.test.js",
+    "test-updateScout": "mocha ./tests/ScoutController/UpdateScout.test.js",
+    "test-adminController": "mocha ./tests/AdministradorController.test.js",
+    "test-loginAdmin": "mocha ./tests/AdministradorController/loginAdmin.test.js",
+    "test-superAdminController": "mocha ./tests/SuperAdminController.test.js",
+    "test-loginSuperAdmin": "mocha ./tests/SuperAdminController/loginSuperAdmin.test.js",
+    "test-createRama": "mocha ./tests/RamaController/CreateRama.test.js",
+    "test-createAdmin": "mocha ./tests/AdministradorController/createAdministrador.test.js",
+    "dev": "nodemon index.js",
+    "prod": "node index.js"
   },
-
   "repository": {
     "type": "git",
     "url": "git+https://github.com/juanestebanalarcon/Backend-server_scouts_pwa.git"
@@ -29,7 +41,7 @@
     "mongoose": "^6.5.2",
     "nodemailer": "^6.7.8",
     "nodemon": "^2.0.19",
-    "serve": "^14.0.1",
-    "supertest": "^6.2.4"
+    "supertest": "^6.2.4",
+    "winston": "^3.8.2"
   }
 }

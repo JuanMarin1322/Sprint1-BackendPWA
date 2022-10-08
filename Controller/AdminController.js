@@ -5,115 +5,160 @@ const Administrador = require("../Model/Administrador");
 const bcrypt = require('bcryptjs');
 const { mailOptions_, transporter } = require("../Helpers/EmailConfig");
 const{RESPONSE_MESSAGES}=require('../Helpers/ResponseMessages');
+const logger = require("../Helpers/LoggerConfig");
+const Rama = require("../Model/Rama");
 
 const createAdmin= async(req,res=response)=>{
-    let { email } = req.body;
+    let { email,ramasAsignadas } = req.body;
     try {  
+        let ramas_asignadas = [];
         let password = generateRandomPass(10);
         let administrador = await Administrador.findOne({ email })
-        if( administrador ){return res.status(400).json({ok: false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS})}
+        if( administrador ){logger.error(`CreateAdmin: Already exists an admin account with the specified email`);
+        return res.status(400).json({ok: false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS})}
         administrador = new Administrador( req.body );
         administrador.password = bcrypt.hashSync( password, bcrypt.genSaltSync() );
+        ramasAsignadas.forEach(idRama => {ramas_asignadas.unshift(idRama);});
+        administrador.ramasAsignadas = ramas_asignadas;
         await administrador.save();
         transporter.sendMail(mailOptions_(email,password,1,administrador.nombre),(err)=>{
-            if(err){console.log(err);}
+            if(err){logger.error(`CreateAdmin: Internal mail server error: ${err}`);}
         });
-       return res.status(201).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
-    } catch (error) {console.log(error);
-        return res.status(500).json({ok:false,msg: RESPONSE_MESSAGES.ERR_500});}
+        logger.info(`CreateAdmin: Sending email to ${email}`);
+        return res.status(201).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
+    } catch (error) {logger.error(`CreateAdmin: Internal server error: ${error}`);
+    return res.status(500).json({ok:false,msg: RESPONSE_MESSAGES.ERR_500});}
     
 }
 const revalidateToken= async(req,res=response) => {
     let {id,nombre,email,rol}=req;
     const token= await generateJWT(id,nombre,email,rol);
-   return res.status(200).json({ok:true,token,uid:id,nombre,email,rol});
+    return res.status(200).json({ok:true,token,uid:id,nombre,email,rol});
 }
 const readAdmin= async(req,res=response)=>{
     try{
         let admin_ = await Administrador.findById(req.params.id);
-        if(admin_){return res.status(200).json({ok:true,admin_ });}
-        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS});
+        if(admin_){
+            logger.info("ReadAdmin: sending admin found...");
+            return res.status(200).json({ok:true,admin_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
+        }
+        logger.error(`ReadAdmin: admin not found`);
+        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
-        console.log(e);
+        logger.error(`ReadAdmin: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
     }
 }
 const readAdmins= async(req,res=response)=>{
     try{
-    let admin_ = await Administrador.find({}).limit(10);
-    if(admin_){return res.status(200).json({ok:true,admin_});}
-    return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
-    }catch(e)
-    {
-        console.log(e);
-        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+        let admins_ = await Administrador.find();
+        if(admins_){
+            logger.info("ReadAdmins: sending admins found...");
+            return res.status(200).json({ok:true,admins_});}
+        logger.error(`ReadAdmins: admins not found`);
+        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+        }catch(e)
+        {
+            logger.error(`ReadAdmins: Internal server error: ${e}`);
+            return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+        }
     }
-
-}
+const readAdminBranch = async(req, res=response)=>{
+        try{
+            let admon = await Administrador.findById(req.params.id).populate('ramasAsignadas');
+            if(!admon){
+                logger.error(`readAdminBranch: admin not found`);
+                return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND})}
+            logger.info("ReadAdmins: sending admin populated by associated branch...");        
+            return res.status(200).json({ok:true,admon,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
+            }catch(e){
+                logger.error(`readAdminBranch: Internal server error: ${e}`);
+                return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
+            }
 const updateAdmin=async(req,res=response)=>{
     try {
         let admin__ = await Administrador.findById( req.params.id );
-        if ( !admin__ ) {return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        await Administrador.updateOne({_id:req.params.id}, {...req.body}, { upsert: true });
+        if ( !admin__ ) {
+            return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        await Administrador.updateOne({_id:req.params.id}, {$set:{...req.body}}, { upsert: true });
         return res.status(200).json({ok: true,msg:RESPONSE_MESSAGES.SUCCESS_2XX})
-    } catch (error) {
-        console.log(error);
-       return res.status(500).json({ok: false,msg:RESPONSE_MESSAGES.ERR_500})
-    }
+        } catch (e) {
+            logger.error(`updateAdmin: Internal server error: ${e}`);
+            return res.status(500).json({ok: false,msg:RESPONSE_MESSAGES.ERR_500})
+        }
 }
 const deleteAdmin =async(req,res=response)=>{
-   try {   
+    try {   
         const admin_ = await Administrador.findById(req.params.id);
-        if ( !admin_ ) {return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-        await admin_.findByIdAndDelete( req.params.id );
+        if ( !admin_ ) {
+            return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        await Administrador.findByIdAndDelete( req.params.id );
         return res.status(200).json({ok: true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
-    } catch (error) {
-        console.log(error);
-       return res.status(500).json({ok: false,msg:RESPONSE_MESSAGES.ERR_500})
-    }
-
-}
+    } catch (e) {
+        logger.error(`deleteAdmin: Internal server error: ${e}`);
+        return res.status(500).json({ok: false,msg:RESPONSE_MESSAGES.ERR_500})
+            }
+            
+        }
 const loginAdmin= async(req,res=response) => {
     const {email,password}=req.body;
     try {
-     const adminDB=await Administrador.findOne({email});
-     if(!adminDB){
-        return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND})
-     }
-     const validPassword=bcrypt.compare(password,adminDB.password);
-     if(!validPassword){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_INVALID_PASSWORD})}
-     const token= await generateJWT(adminDB.id,adminDB.nombre,adminDB.email,1);
-     return res.status(200).json({ok:true,uid:adminDB.id,nombre:adminDB.nombre,email,rol:1,token})
-    } catch (error) {
-        console.log(error);
-        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
+        const adminDB=await Administrador.findOne({email});
+        if(!adminDB){
+            logger.error("loginAdmin: admin email not found");
+            return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND})
+        }
+        const validPassword=bcrypt.compare(password,adminDB.password);
+        if(!validPassword){
+            logger.error("loginAdmin: admin password is incorrect");
+            return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_INVALID_PASSWORD})}
+        logger.info("loginAdmin: building admin token");
+        const token= await generateJWT(adminDB.id,adminDB.nombre,adminDB.email,1);
+        logger.info("loginAdmin: sending admin login info");
+        return res.status(200).json({ok:true,uid:adminDB.id,nombre:adminDB.nombre,email,rol:1,token})
+        } catch (e) {
+            logger.error(`loginAdmin: Internal server error: ${e}`);
+            return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500})
+        }
     }
-}
 const changePassword = async (req, res)=>{
     try{
         let {newPassword,email} = req.body;
         const adminDB = await Administrador.findOne({email:email});
-        if(!adminDB){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
-        let password =bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
-        adminDB.password = password;
+        if(!adminDB){
+            logger.error("changePasswordAdmin: error admin email not found");
+            return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
+        adminDB.password =bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
         await adminDB.save();
         transporter.sendMail(mailOptions_(adminDB.email,newPassword,2,adminDB.nombre),(err)=>{
-            if(err){console.log(err);}
-            console.log("Envío exitoso");
+        if(err){logger.error(`changePasswordAdmin: Error occurred while sending password recovery email: ${err}`);}
+        logger.info(`changePasswordAdmin: sending password recovery email...`);
         });
         return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
-}catch(e){
-    console.log(e);
+    }catch(e){
+    logger.error(`changePasswordAdmin: Internal server error: ${e}`);
     return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});}
+}
+const changeAdminBranch = async (req, res=response) => {
+    try{
+        let admin = await Administrador.findById(req.params.id);
+        if(!admin) {return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        admin.ramasAsignadas=req.body.RamasNuevas;
+        await admin.save();
+        return res.status(200).json({ok: true,msg:RESPONSE_MESSAGES.SUCCESS_2XX})
+    }catch(err){logger.error(`changeAdminBranch: Internal server error: ${err}`);
+    return res.status(500).json({ok: false,msg: RESPONSE_MESSAGES.ERR_500})}
 }
 module.exports={
     loginAdmin,
     createAdmin,
     readAdmin,
     readAdmins,
+    readAdminBranch,
     updateAdmin,
     deleteAdmin,
     changePassword,
+    changeAdminBranch,
     revalidateToken
 
 }
