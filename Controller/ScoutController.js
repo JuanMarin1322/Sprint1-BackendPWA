@@ -19,10 +19,11 @@ const createScout = async(req,res=response) => {
         dbScout=new Scout(req.body);
         dbScout.password=bcrypt.hashSync(password,bcrypt.genSaltSync());
         await dbScout.save();
+        if(req.body.idRama===undefined){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_FIELD_REQUIRED});}
         let rama = await Rama.findById(req.body.idRama);
         if(!rama){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
         rama.Scout.push(dbScout.id);
-        rama.save();
+        await rama.save();
         transporter.sendMail(mailOptions_(email,password,1,dbScout.nombre),(err)=>{if(err){console.log(err);}});
         const token= await generateJWT(dbScout.id,dbScout.nombre);
         return res.status(201).json({ok:true,uid:dbScout.id,nombre:dbScout.nombre,email,token});
@@ -118,12 +119,11 @@ const updateScout= async(req,res=response) =>{
 const deleteScout = async (req,res=response) =>{
     try{
         const scoutDB = await Scout.findById(req.params.id);
-        if(!scoutDB){
+        if(!scoutDB){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        let rama = await Rama.findOne({Scout:scoutDB.id});
+        if( !rama ) {
+            logger.info("deleteScout: associated branch not found");
             return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
-            let rama = await Rama.findOne({Scout:scoutDB.id});
-            if( !rama ) {
-                logger.info("deleteScout: associated branch not found");
-                return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
             let acudiente__ = await Acudiente.findOne({Scout:scoutDB.id});
             let oldScout = rama.Scout,oldAcudiente_=acudiente__.Scout;
             try{
@@ -142,9 +142,10 @@ const deleteScout = async (req,res=response) =>{
 
 const changePassword = async (req, res)=>{
     try{
-        let {newPassword,email} = req.body;
+        let {newPassword,currentPassword,email} = req.body;
         const scoutDB = await Scout.findOne({email:email});
         if(!scoutDB){return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_EMAIL_NOT_FOUND});}
+        if(!bcrypt.compareSync(currentPassword,scoutDB.password)){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_INVALID_PASSWORD})}
         scoutDB.password = bcrypt.hashSync(newPassword,bcrypt.genSaltSync());
         await scoutDB.save();
         transporter.sendMail(mailOptions_(scoutDB.email,newPassword,2,scoutDB.nombre),(err)=>{

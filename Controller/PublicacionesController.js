@@ -20,7 +20,7 @@ const createPublicacion= async(req,res=response)=>{
 const readPublicacion= async(req,res=response)=>{
     try
     {
-    const publicacion_ = await Publicaciones.findById(req.params.id);
+    const publicacion_ = await Publicaciones.findById(req.params.id).populate({path:"ramaAsignada",populate:{path:"Scout"}});
     if(publicacion_){return res.status(200).json({ok:true,publicacion_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
     return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e)
@@ -30,13 +30,47 @@ const readPublicacion= async(req,res=response)=>{
     }
 
 }
+const readPublicacionesByBranch= async(req,res=response)=>{
+    try
+    {
+    const publicaciones_ = await Publicaciones.find({ramaAsignada:req.params.idRama}).populate({path:"ramaAsignada",populate:{path:"Scout"}});
+    if(publicaciones_.length>0){return res.status(200).json({ok:true,publicaciones_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
+    return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+    }catch(e)
+    {
+        logger.error(`readPublicacionesByBranch: Internal server error: ${e}`);
+        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+    }
+
+}
+
 const readPublicaciones= async(req,res=response)=>{
     try{
-        const publicaciones_ = await Publicaciones.find();
-        if(publicaciones_){return res.status(200).json({ok:true,publicaciones_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
+        const publicaciones_ = await Publicaciones.find({}).populate({path:"ramaAsignada",populate:{path:"Scout"}});
+        if(publicaciones_.length>0){return res.status(200).json({ok:true,publicaciones_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
         logger.error(`readPublicaciones: Internal server error: ${e}`);
+        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+    }
+}
+const readlastTwoPublicaciones= async(req,res=response)=>{
+    try{
+        const publicaciones_ = await Publicaciones.find({}).limit(2).populate({path:"ramaAsignada",populate:{path:"Scout"}});
+        if(publicaciones_.length>0){return res.status(200).json({ok:true,publicaciones_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
+        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+    }catch(e){
+        logger.error(`readlastTwoPublicaciones: Internal server error: ${e}`);
+        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+    }
+}
+const readlastTwoPublicacionesByBranch= async(req,res=response)=>{
+    try{
+        const publicaciones_ = await Publicaciones.find({ramaAsignada:req.body.idRama}).limit(2).populate({path:"ramaAsignada",populate:{path:"Scout"}});
+        if(publicaciones_.length>0){return res.status(200).json({ok:true,publicaciones_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
+        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+    }catch(e){
+        logger.error(`readlastTwoPublicacionesByBranch: Internal server error: ${e}`);
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
     }
 }
@@ -67,6 +101,9 @@ module.exports={
    createPublicacion,
    readPublicacion,
    readPublicaciones,
+   readlastTwoPublicaciones,
+   readlastTwoPublicacionesByBranch,
+   readPublicacionesByBranch,
    updatePublicacion,
    deletePublicacion
 
