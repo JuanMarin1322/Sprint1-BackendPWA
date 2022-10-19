@@ -1,6 +1,4 @@
 const { Schema, model } = require('mongoose');
-const mongoose = require('mongoose');
-const DateOnly = require('mongoose-dateonly')(mongoose);
 
 const Publicaciones = Schema({
 titulo: {
@@ -16,8 +14,9 @@ linkImagen: {
     required:true
 },
 autor: {
-    type: String,
-    required:true
+    id:{type:String},
+    nombre:{type:String},
+    apellido:{type:String},
 },
 ramaAsignada: {
     type:Array,
@@ -25,7 +24,7 @@ ramaAsignada: {
     required:false
 },
 fecha: {
-    type: DateOnly,
+    type: Date,
     required:true
 },
 })

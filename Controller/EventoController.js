@@ -4,8 +4,6 @@ const Evento = require("../Model/Evento");
 const Rama = require('../Model/Rama');
 const Scout = require('../Model/Scout');
 const logger = require('../Helpers/LoggerConfig');
-const mongoose = require('mongoose');
-const DateOnly = require('mongoose-dateonly')(mongoose);
 
 const createEvento= async(req,res=response)=>{
     try{
@@ -49,7 +47,7 @@ const addScoutsToEvent= async(req,res=response)=>{
 
 const readEventos= async(req,res=response)=>{
     try{
-        const Eventos_ = await Evento.find({});
+        const Eventos_ = await Evento.find();
         if(Eventos_){return res.status(200).json({ok:true,Eventos_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
@@ -59,8 +57,7 @@ const readEventos= async(req,res=response)=>{
 }
 const readEventosOfWeek= async(req,res=response)=>{
     try{
-        let {startDate} = req.body;
-        const Eventos_ = await Evento.find({fechaYHoraInicio:{$gte:new DateOnly(startDate),$lte:new DateOnly(startDate)}});
+        const Eventos_ = await Evento.find({fechaYHoraInicio:{$gte:req.params.startDate}});
         if(Eventos_.length>0){return res.status(200).json({ok:true,Eventos_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
@@ -70,7 +67,7 @@ const readEventosOfWeek= async(req,res=response)=>{
 }
 const readEventosByBranch= async(req,res=response)=>{
     try{
-        const Eventos_ = await Evento.find({ramaAsignada:req.body.idRama});
+        const Eventos_ = await Evento.find({ramaAsignada:req.params.idRama,fechaYHoraInicio:{$gte:req.params.startDate}});
         if(Eventos_){return res.status(200).json({ok:true,Eventos_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
@@ -80,7 +77,7 @@ const readEventosByBranch= async(req,res=response)=>{
 }
 const readlastTowEventosByBranch= async(req,res=response)=>{
     try{
-        const Eventos_ = await Evento.find({ramaAsignada:req.body.idRama}).limit(2);
+        const Eventos_ = await Evento.find({ramaAsignada:req.params.idRama}).limit(2);
         if(Eventos_){return res.status(200).json({ok:true,Eventos_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
         return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
     }catch(e){
