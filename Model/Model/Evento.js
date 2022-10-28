@@ -1,6 +1,6 @@
 const { Schema, model } = require('mongoose');
 
-const Publicaciones = Schema({
+const Evento = Schema({
 titulo: {
     type: String,
     required:true
@@ -18,15 +18,23 @@ autor: {
     nombre:{type:String},
     apellido:{type:String},
 },
-ramaAsignada: {
-    type:Array,
-    ref:'Rama',
-    required:false
-},
-fecha: {
+fechaYHoraInicio: {
     type: Date,
     required:true
 },
-isGeneral: {type: Boolean,required:false}
+fechaYHoraFinal: {
+    type: Date,
+    required:true
+},
+ramaAsignada: {
+    type:Array,
+    ref:"Rama",
+    required:false
+},
+inscritos:{
+    type: Array,
+    ref:"Scout",
+    required:false
+}
 })
-module.exports = model("Publicaciones",Publicaciones)
+module.exports = model("Evento",Evento)

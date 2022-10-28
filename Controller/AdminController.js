@@ -14,11 +14,10 @@ const createAdmin= async(req,res=response)=>{
         if( administrador ){logger.error(`CreateAdmin: Already exists an admin account with the specified email`);
         return res.status(400).json({ok: false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS})}
         administrador = new Administrador( req.body );
+        administrador.ramasAsignadas = req.body.ramasAsignadas;
         administrador.password = bcrypt.hashSync( password, bcrypt.genSaltSync() );
         await administrador.save();
-        transporter.sendMail(mailOptions_(req.body.email,password,1,administrador.nombre),(err)=>{
-            if(err){logger.error(`CreateAdmin: Internal mail server error: ${err}`);}
-        });
+        transporter.sendMail(mailOptions_(req.body.email,password,1,administrador.nombre),(err)=>{if(err){logger.error(`CreateAdmin: Internal mail server error: ${err}`);}});
         logger.info(`CreateAdmin: Sending email to ${req.body.email}`);
         const token= await generateJWT(administrador.id,administrador.nombre,administrador.apellido,administrador.email,1);
         return res.status(201).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX,token});
@@ -86,8 +85,8 @@ const readAdminBranchScouts = async(req, res=response)=>{
 const updateAdmin=async(req,res=response)=>{
     try {
         let admin__ = await Administrador.findById( req.params.id );
-        if ( !admin__ ) {
-            return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        if ( !admin__ ) {return res.status(404).json({ok: false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
+        if(req.body.email){return res.status(400).json({ok:false,msg:RESPONSE_MESSAGES.ERR_ALREADY_EXISTS});}
         await Administrador.updateOne({_id:req.params.id}, {$set:{...req.body}}, { upsert: true });
         return res.status(200).json({ok: true,msg:RESPONSE_MESSAGES.SUCCESS_2XX})
         } catch (e) {

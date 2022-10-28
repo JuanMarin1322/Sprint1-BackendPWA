@@ -27,6 +27,5 @@ fecha: {
     type: Date,
     required:true
 },
-isGeneral: {type: Boolean,required:false}
 })
 module.exports = model("Publicaciones",Publicaciones)

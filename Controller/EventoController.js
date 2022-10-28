@@ -7,6 +7,12 @@ const logger = require('../Helpers/LoggerConfig');
 
 const createEvento= async(req,res=response)=>{
     try{
+        
+        if(req.body.isGeneral){
+            let evento = new Evento(req.body);
+            await evento.save();
+            return res.status(200).json({ok:true,msg:RESPONSE_MESSAGES.SUCCESS_2XX});
+        }
         let rama_asociada = await Rama.findById(req.body.idRama);
         if(!rama_asociada ) {return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});}
         let evento = new Evento(req.body);
@@ -95,6 +101,16 @@ const readlastTowEventosByBranch= async(req,res=response)=>{
         return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
     }
 }
+const readGeneralEventos= async(req,res=response)=>{
+    try{
+        const eventos_ = await Evento.find({isGeneral:true}).populate("ramaAsignada").populate("inscritos");
+        if(eventos_.length>0){return res.status(200).json({ok:true,eventos_,msg:RESPONSE_MESSAGES.SUCCESS_2XX});}
+        return res.status(404).json({ok:false,msg:RESPONSE_MESSAGES.ERR_NOT_FOUND});
+    }catch(e){
+        logger.error(`readGeneralPublicaciones: Internal server error: ${e}`);
+        return res.status(500).json({ok:false,msg:RESPONSE_MESSAGES.ERR_500});
+    }
+}
 const readAllEventosByBranch= async(req,res=response)=>{
     try{
         const Eventos_ = await Evento.find({ramaAsignada:req.params.idRama});
@@ -158,6 +174,7 @@ module.exports={
     readlastTowEventosByBranch,
     readEventosByBranchAndDate,
     readAllEventosByBranch,
+    readGeneralEventos,
     readEventosByDate,
     readEventos,
     readEventosOfWeek,
